@@ -29,6 +29,7 @@ The continual growth of air transportation is posing political and societal chal
 To meet the challenges of the continual growth, major transformation programmes are underway across the globe and the last years have seen a series of deployments at various locations. 
 With the increasing focus on However, the access to supporting data and results is often limited. 
 
+Manual on ANS Performance [@icao_doc9883_2009].
 
 For example, @schultz_2020 postulate an ADSB-lite concept with a view to the costs involved in implementing airport collaborative decision-making (ACDM) at smaller airports.
 
