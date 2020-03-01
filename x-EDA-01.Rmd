@@ -1,0 +1,75 @@
+---
+title: "Untitled"
+author: "Play with OSN and OSM"
+date: "20/02/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+library(ggspatial)
+library(sf)
+library(lubridate)
+```
+
+## Overview
+
+This is R Markdown document lists the steps during the exploratory data analysis for the ICNS2020 paper.
+
+Data had been downloaded from OSN (e.g. EDDF).
+Chart related data has been extracted from Open Street Map.
+
+## Load data
+
+```{r}
+trjs <- read_csv(
+  "./data-src/adsb_eddf_2019-04-22_0900-1000.csv"
+  ,col_types = cols(
+     time   = col_double()
+    ,icao24 = col_character()
+    ,   lat = col_double()
+    ,   lon = col_double()
+    ,velocity = col_double()
+    , heading = col_double()
+    ,vertrate = col_double()
+    ,callsign = col_character()
+    ,onground = col_logical()
+    ,   alert = col_logical()
+    ,     spi = col_logical()
+    ,  squawk = col_character()
+    ,baroaltitude = col_double()
+    , geoaltitude = col_double()
+    ,lastposupdate = col_double()
+    ,  lastcontact = col_double()
+    ,  hour = col_double()
+  ))
+```
+
+TO-DO add osm functions
+
+```{r}
+eddf_ad <- osm_apt(.bb_lonlat = c(8.479385,49.989753,8.616028,50.055596))
+eddf_ad
+```
+
+
+What to do with the trajectories - good candidates for stand identification
+
+```{r}
+trjs <- trjs %>%
+  mutate(time = as_datetime(time))
+
+payload <- trjs %>% group_by(icao24, callsign) %>% summarise(N = n(), GND = sum(onground == TRUE)) %>% arrange(desc(N)) %>% ungroup() %>% filter(GND != 0)
+
+trjs <- trjs %>% right_join(payload, by=c("icao24","callsign"))
+
+ds <- trjs %>% filter(icao24 %in% payload$icao24[10])
+```
+
+
+ggplot(data = ds, mapping = aes(x = lon, y = lat, color = icao24)) + 
+  geom_point() +
+  xlim(8.52, 8.61) + ylim(50, 50.055)
+  
