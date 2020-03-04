@@ -3,7 +3,8 @@ title: "Operational Performance Analyses at European Airports with Community-Col
 author: "RQ"
 date: "02/02/2020"
 output:
-  bookdown::pdf_document2: default
+  bookdown::pdf_document2:
+    toc: false
   html_document:
     df_print: paged
   word_document: default
@@ -56,7 +57,8 @@ The contributions of this paper are as follows:
 
 # Background/Context
 
-*
+While there never existed a disagreement about the fact that air transport / air traffic engineering requires access to data for developing advanced models or verify and validate reported results, the actual access to the data is traditionally sparse.
+The status and access to data in air transportation research has been analysed by @bourgois_2014.
 
 <!-- emergence of open data and communities -->
 The emergence of aviation related communities of interest is closely linked with the pervasive use of the internet.
@@ -208,7 +210,7 @@ The authors further want to thank the Opensky-Network community
 
 # Reproducibility
 
-This paper is fully reproducible. The underlying Rmarkdown file, the supporting data preparatory and analytical scripts are available at: 
+This paper is fully reproducible. The underlying Rmarkdown file, the supporting data preparatory and analytical scripts are available at: https://github.com/rainer-rq-koelle/paper-2020-ICNS.
 
 # References
 
