@@ -26,12 +26,23 @@ This paper studies the operational benefits of two recent deployments for enhanc
 
 The continual growth of air transportation is posing political and societal challenges. Throughout the recent years there has been a debate to what extent the funding of the on-going transformation programmes have resulted in tangible system improvements. Prevailing operational limits on one hand, but also the emerging societal pressure in terms of environmental sustainability on the other hand are a concern for political decision-makers and strategic planers. To address the political debate, ICAO is promoting a performance-based approach through its Global Air Navigation Plan (GANP) and associated building blocks of the future air transportation system. The performance-based approach builds on data analytics to increase the transparency in terms of bottleneck identification or observed performance benefits from novel operational concepts or deployed technical enablers. 
 
-To meet the challenges of the continual growth, major transformation programmes are underway across the globe and the last years have seen a series of deployments at various locations. 
-With the increasing focus on However, the access to supporting data and results is often limited. 
-
 Manual on ANS Performance [@icao_doc9883_2009].
 
+To meet the challenges of the continual growth, major transformation programmes are underway across the globe and the last years have seen a series of deployments at various locations. 
+With the increasing focus on XXXX however, the access to supporting data and results is often limited. 
+
+The advent of ADSB data offer an opportunity for wider access to the data. 
+In particular this technology offers access to trajectory data by researchers and data scientists in aviation and air traffic management.
+Accordingly, the continued development ... helps to harmonise approaches to data analytics. 
+Recent advances in artificial intelligence and machine learning can benefit from access to data.
+
+The reproducibility paradigm and data sharing philosophy are a cornerstone of advancing the state of the art.
+
 For example, @schultz_2020 postulate an ADSB-lite concept with a view to the costs involved in implementing airport collaborative decision-making (ACDM) at smaller airports.
+@olive_2019 developed a toolbox for the analysis of air traffic data.
+The Performance Review Unit (PRU) is actively marketing an open reference trajectory project for the benefit of higher transparency in the operational monitoring of performance in Europe.
+
+Popular platform Opensky Network (OSN) [@osn_2014].
 
 
 <!-- contribution -->
@@ -86,6 +97,8 @@ The topic was first articulated at the 2017 ATM Seminar.
 Spinielli and Koelle published a paper demonstrating the replicability of the research pipeline in XXX. The paper and its underlying data is openly available via https://XXX.
 During the SESAR Innovation Days, December 2019, a wider discussion took place about the availability of data for research.
 
+Within the field of air transportation and air traffic initial implementations are emerging.
+Related to our work is **traffic**, a Python based toolbox for the trajectory based analytics [@olive_2019].
 
 ## Process
 
@@ -95,6 +108,38 @@ During the SESAR Innovation Days, December 2019, a wider discussion took place a
 
 * develop diagram showing activities (left col), results/findings (middle col), and contributions (right col)
 * or schematic about artefacts (c.f. paper with data model shared with Martin/OSN and Enrico)
+
+Fig. \@ref(fig:approach-toolbox) shows SOMETHING COOL.
+
+(ref:approach-toolbox) Overview of the Approach
+
+```{r approach-toolbox, fig.cap="(ref:approach-toolbox)", out.width="50%", fig.pos="ht", echo=FALSE}
+knitr::include_graphics("figures/architecture-traffic-toolbox.png")
+```
+
+
+This paper utilises the aircraft data base developed by @sun_adsbdb_2020.
+
+ADSB data provides for measured signals that support the reconstruction of actual flown trajectories.
+(VERBATIM)Trajectories are mathematical objects used to describe the evolution of a moving object with
+a finite list of parameters [@olive_2019] (END VERBATIM).
+We generalise the concept of a trajecory to a single flight of an aircraft from its departure (ADEP) to destination (ADEP) aerodrome. The trajectory is described as a set of 4-positions, i.e. timestamp indexed latitude, longetude, and altitude information.
+
+
+
+Opensky Network state vector provides the following trajectory features:
+
+* aircraft identification
+* timestamp
+* latitude, longitude, and altitude.
+
+The data comprises also fields for ground speed, track angle and vertical rate. 
+
+
+
+ACDM-lite [@schultz_acdmlite_2019, @schultz_2020]
+
+
 
 # Results 
 
@@ -152,6 +197,18 @@ The results obtained confirm the general feasibility of applying and combining o
 
 * application of results
 
+# Disclaimer
+
+The views expressed in this paper are the authors' own and do not reflect a position or policy of EUROCONTROL.
+
+# Acknowledgments
+
+This work was conducted under the auspices of the Performance Review Commission of EUROCONTROL and the preparatory action of establishing an open reference trajectory for performance monnitoring in Europe.
+The authors further want to thank the Opensky-Network community 
+
+# Reproducibility
+
+This paper is fully reproducible. The underlying Rmarkdown file, the supporting data preparatory and analytical scripts are available at: 
 
 # References
 
