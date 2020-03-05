@@ -1,0 +1,393 @@
+---
+title: "Untitled"
+author: "RQ"
+date: "03/03/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(lubridate)
+library(zoo)
+library(ggplot2)
+library(gganimate)
+```
+
+## Overview
+
+This files puts together the data analytical steps for the pre-processing of the ADSB data for the ICNS paper
+
+One of the ADSB test files was copied from the folder repo to this repo into the data subfolder.
+This way the download from OSN could be run in a different sesstion.
+
+## Read In Test Data
+
+```{r}
+trjs <- read_csv("./data/adsb_eddf_2019-04-22_0900-1000.csv") %>%
+  mutate(time = as_datetime(time))
+
+fact <- read_csv2("../__DATA/EDDF/EDDF_2019_FACT.csv") %>%
+  select(FLTID = AP_C_FLTID, REG = AP_C_REG, ADEP = ADEP_ICAO, ADES = ADES_ICAO
+         ,MVT_TIME_UTC, BLOCK_TIME_UTC, SCHED_TIME_UTC
+         ,ARCTYP
+         ,CLASS = AC_CLASS, RWY = AP_C_RWY, STND = AP_C_STND
+         ,SRC_PHASE
+         ,C40_CROSS_TIME, C40_BEARING,C40_CROSS_LAT,C40_CROSS_LON,C40_CROSS_FL) %>%
+  mutate( MVT_TIME_UTC  = lubridate::parse_date_time(MVT_TIME_UTC,   orders="%d.%m.%.Y %T")
+         ,BLOCK_TIME_UTC= lubridate::parse_date_time(BLOCK_TIME_UTC, orders="%d.%m.%.Y %T")
+         ,SCHED_TIME_UTC= lubridate::parse_date_time(SCHED_TIME_UTC, orders="%d.%m.%.Y %T")
+         ,C40_CROSS_TIME= lubridate::parse_date_time(C40_CROSS_TIME, orders="%d.%m.%.Y %T")
+         )
+
+acdb <- read_csv("../__DATA/aircraft/aircraft_db.csv") %>%
+  mutate( REG = gsub(pattern="-", replacement="", regid)
+         ,REG = toupper(REG)
+         ,mdl = toupper(mdl))
+```
+Add icao hex to fact
+
+```{r}
+fact2 <- fact %>% left_join(acdb, by = "REG")
+dsf  <- fact2 %>% filter(MVT_TIME_UTC >= as.POSIXct("2019-04-22 00:00:00", tz="UTC"),
+                        MVT_TIME_UTC <= as.POSIXct("2019-04-23 00:00:00", tz="UTC"))
+```
+
+Simple traffic statistics for EDDF
+
+```{r}
+traffic_count_per_day <- function(.flts,.start,.end){
+  cnt <- .flts %>% 
+    mutate(DOF = as.Date(MVT_TIME_UTC)) %>%
+    filter(MVT_TIME_UTC >= as.POSIXct(.start, tz="UTC")
+          ,MVT_TIME_UTC <= as.POSIXct(.end,   tz="UTC")) %>%
+  group_by(DOF, SRC_PHASE) %>%
+  summarise(N = n())
+return(cnt)
+}
+
+start_date <- "2019-04-22 00:00:00"
+end_date   <- "2019-05-20 00:00:00"
+
+cnt_fact <- traffic_count_per_day(fact, start_date, end_date)
+cnt_fact2<- traffic_count_per_day(fact2, start_date, end_date)
+cnt_dsf  <- traffic_count_per_day(dsf  ,"2019-04-22 00:00:00", "2019-04-23 00:00:00")
+```
+
+Let's do the traffic count for the study period:
+
+```{r}
+cnt_dsf <- cnt_fact2 %>% sample_frac(0.80)    # change this when data crunching ready ########## TOOOOOOOODOOOOOOOOOOOOOOOOO !!!!!!
+cnt_dsf  <- cnt_dsf %>% rename(ADSB = N)
+cnt_fact <- cnt_fact %>% rename(APDF = N)
+
+cnts <- cnt_fact %>% left_join(cnt_dsf, by=c("DOF","SRC_PHASE"))
+
+ggplot(data = cnts) + 
+  geom_col(mapping = aes(x=DOF-0.5, y=APDF, fill=SRC_PHASE), position = "stack", width = 0.3) +
+  geom_col(mapping = aes(x=DOF+0.5, y=ADSB, fill=SRC_PHASE), position = "stack", width = 0.3) +
+  theme_minimal() +
+  theme(legend.position = "none") 
+```
+
+
+Check for what is in the data
+
+```{r}
+payload <- trjs %>% group_by(icao24, callsign) %>% 
+  summarise(N = n(), GND = sum(onground == TRUE), AIRB = sum(onground == FALSE)) %>% 
+  arrange(desc(N)) %>%
+  # filter only on gnd
+  filter(AIRB >=60) %>%
+  # filter overflights
+  filter(GND != 0)
+```
+
+## check dircetion of flight - arrival or departure
+
+A trjectory is a series of timestamps and lat lon positions, including altitude and other meta data associated with an icao24/callsign tuple (or just one of these).
+For each trajectory we can compare the initial and last measurements (i.e. top_n()) and determine whether these are in the air or on the ground.
+
+
+```{r}
+is_arr <- function(.trj, only_guess = TRUE){
+  last <- .trj %>% top_n(10, time)
+  last = last %>% 
+    summarise(ltime = mean(time, na.rm = TRUE), lon_gnd = sum(onground, na.rm=TRUE))
+  first = .trj %>% top_n(-10, time)
+  first = first %>% 
+    summarise(ftime = mean(time, na.rm = TRUE), fon_gnd = sum(onground, na.rm=TRUE))
+  
+  out = bind_cols(first, last)
+  out <- out %>% 
+    mutate(MVT = case_when(
+       fon_gnd == 0 & lon_gnd == 0 ~ "OVR"
+      ,fon_gnd < lon_gnd ~ "ARR"
+      ,lon_gnd < fon_gnd ~ "DEP"
+      , TRUE ~ "OTH")
+    )
+
+  if(only_guess){out <- out %>% pull(MVT)}  # only provide a flag
+  return(out)
+}
+```
+
+how to handle or extract stationary vehicles or vehicles sitting on ground?
+trjs %>% group_by(callsign) %>% summarise(N = n(), ONG = sum(onground), NNA = sum(is.na(onground))) %>% mutate(SITONG = (ONG / N) >=0.95) %>% filter(SITONG == TRUE)
+
+
+```{r}
+# next test sample
+ds <- trjs %>% group_by(icao24, callsign) %>% tidyr::nest()
+ds <- ds %>% 
+  mutate(
+    MVT = map(.x=data, .f=~is_arr(.x))
+    ,N  = map(.x=data, .f=~nrow(.x))
+    ) %>% 
+  tidyr::unnest(cols = c(MVT, N)) 
+
+# write_csv(ds %>% select(icao24, callsign, MVT, N), "./data/EDDF-sample-arr-or-dep.csv")
+```
+
+## Load Airport Layout
+
+source osm hack from supporting file. TODO embedd in proper function and add to here.
+
+eddf_ad <- osm_apt(.bb_lonlat = c(8.479385,49.989753,8.616028,50.055596))
+eddf_ad
+
+check some of the non movers
+trjs %>% group_by(callsign) %>% summarise(N = n(), ONG = sum(onground), NNA = sum(is.na(onground))) %>% mutate(SITONG = (ONG / N) >=0.95) %>% filter(SITONG == TRUE)
+
+stationary <- trjs %>% filter(callsign %in% c("CFG207","CTN413", "FF","FIN7DU","DLH5TP"))
+p <- eddf_ad
+p <- p + geom_point(data = stationary, mapping=aes(x=lon, y=lat, color=callsign))
+p
+
+## Fun Output - Animated Arrival 
+
+```{r}
+# handpicked flights 
+# mt <- trjs %>% filter(callsign %in% c("DLH393","TUI64L","DLH3W","DLH447","LZB437","DLH8HP","DLH465"))
+
+# inspecting ds it seems that N > 500 gives good samples, a few breadcrumbs sit below 100
+flts_arr <- ds %>% filter(MVT == "ARR", N > 100)
+mt <- trjs %>% filter(callsign %in% (flts_arr %>% pull(callsign)))
+
+viz_stat <- ggplot(data = mt, aes(x=lon, y=lat, color=callsign)) + geom_point() + theme_minimal()
+viz_stat
+
+viz_anim <- viz_stat + labs(title = "Time: {frame_time}") + gganimate::transition_time(time)
+viz_anim
+
+#save the whole thing
+gganimate::anim_save("EDDF_arrs_1h.gif", path = "./data/")
+```
+
+## Fun Output - Animated Departures
+
+```{r}
+# handpicked flights 
+# mt <- trjs %>% filter(callsign %in% c(....))
+
+# inspecting ds it seems that N > 500 gives good samples, a few breadcrumbs sit below 100
+flts_dep <- ds %>% filter(MVT == "DEP", N > 100)
+mt <- trjs %>% filter(callsign %in% (flts_dep %>% pull(callsign)))
+
+viz_stat <- ggplot(data = mt, aes(x=lon, y=lat, color=callsign)) + geom_point() + theme_minimal()
+viz_stat
+
+viz_anim <- viz_stat + labs(title = "Deps - Time: {frame_time}") + gganimate::transition_time(time)
+viz_anim
+
+#save the whole thing
+gganimate::anim_save("EDDF_deps_1h.gif", path = "./data/")
+```
+
+Zoom in on the airport
+
+```{r}
+pp <- eddf_ad + geom_point(data = mt, aes(x=lon, y=lat, color=callsign)) + theme_minimal() + xlim(8.475,8.65) + ylim(49.99,50.07) + guides(color=FALSE)
+viz_anim2 <- pp + labs(title = "Time: {frame_time}") + gganimate::transition_time(time)
+# small size
+viz_anim2
+# viz_anim3 <- gganimate::animate(viz_anim2, width = 1000, height = 1000)
+# gganimate::anim_save("EDDF_deps_1h_zoom.gif", path = "./data/")
+```
+
+## Study Departures
+
+```{r}
+# first test candidate: 4ca5c8 EIN65W
+# 2: 3c65c3 DLH6RL
+# 3: 3c4b28 DLH430
+# 6: 507c48 UZB232 
+md <- flts_dep$data[[2]]
+
+dep_analytic <- function(.trj, .elev_buf = 200){
+  md       <- .trj
+  elev_buf <- .elev_buf
+
+md2 <- md %>% arrange(time) %>% 
+  mutate(lat_prev = lead(lat), lon_prev = lead(lon)
+         , lat_d = lat -lat_prev, lon_d = lon - lon_prev)
+
+fst <- md2 %>% filter(time == min(time)) 
+fst_pt <-c(fst$lon,fst$lat)
+
+is_next_airb <- function(.airb){ifelse(lag(.airb)=="AIRB", "AIRB", NA)}
+
+md2 <- md2 %>% 
+  mutate( id    = row.names(md2)
+         ,dist  = geosphere::distHaversine(fst_pt, cbind(lon,lat))
+         ,dist2 = dist >= 1
+         ,taxi  = ifelse( dist2 == TRUE & onground == TRUE, "TAXI", NA)
+         ,lift  = ifelse( is.na(velocity) & is.na(vertrate) & onground == FALSE & baroaltitude <= elev_buf, "LIFT"
+                  ,ifelse(is.na(velocity) & is.na(vertrate) & onground == FALSE & is.na(baroaltitude), "LIFT"
+                  ,ifelse( velocity > 0   & vertrate > 0    & onground == FALSE & baroaltitude <= elev_buf, "LIFT"
+                           , NA) ) )
+         ,airb  = ifelse( velocity > 0 & vertrate > 0, "AIRB", NA )
+         ,lift2 = is_next_airb(airb)
+         )
+
+fst <-  md2 %>% filter(time == min(time)) %>% select(time, lat, lon, id) %>%
+  mutate(point = "FIRST", comment = "")
+
+txi <- md2 %>% filter(taxi == "TAXI") %>% filter(time == min(time)) %>%
+  select(time, lat, lon, id) %>% 
+  mutate(point = "AOBT", comment = "")
+
+tko <- md2 %>% filter(lift == "LIFT" & baroaltitude <= elev_buf) %>%
+  select(time, lat, lon, id) %>%
+  mutate(point = "ATOT", comment = "") 
+if(nrow(tko) > 5){
+      tko <- tko[1:5,]
+      tko$comment[1]=paste0(" more than 5 LIFTs")}
+tko <- tko %>%
+  summarise(time = median(time), lat = median(lat), lon = median(lon)
+            , id      = paste0(id,      collapse = "+"), point = unique(point)
+            , comment = paste0(comment, collapse = " ")
+            )
+
+end <- md2 %>% filter(time == max(time)) %>%
+  select(time, lat, lon, id) %>%
+  mutate(point = "LAST", comment = "")
+
+out <- bind_rows(fst, txi,tko,end)
+}
+ 
+# %>% select(time, lat, lon, lat_prev, lon_prev,lat_d, lon_d, point) 
+# md2 %>% select(time, lat, lon, velocity, vertrate, onground)
+```
+
+md2[115:125,] %>% select(time, lat, lon, dist, dist2, point)
+md2[605:615,] %>% select(time, lat, lon, dist, dist2, velocity, heading, vertrate, onground, point)
+
+```{}
+deps <- ds %>% filter(MVT == "DEP") %>%
+  mutate(EVENTS = map(.x=data, .f=~dep_analytic(.x)))
+```
+
+```{r}
+( dep_analytic(flts_dep$data[[9]]) )
+```
+
+mydep <- trjs %>% filter(callsign == "EIN65W")
+
+```{r}
+dist_pt_to_pt <- function(.trj){
+  df <- .trj %>% arrange(time) %>%
+    mutate(lat_n = lead(lat), lon_n = lead(lon)
+           ,dist = geosphere::distHaversine(cbind(lon, lat), cbind(lon_n,lat_n))
+           )
+  df$lat_n <- NULL; df$lon_n <- NULL
+  return(df)  
+}
+
+hold_roll <- function(.trj){
+  df <- .trj %>% 
+    mutate(
+       dist_sum = cumsum(dist)
+      ,roll     = ifelse(lead(dist_sum) == dist_sum, "HOLD","ROLL")
+      )
+  return(df)
+}
+
+airborne <- function(.trj){
+  df <- .trj %>%
+    mutate( airb = ifelse(onground == FALSE, 1, 0)
+           ,airb2 =zoo::rollmean(airb, 19, fill=NA)
+           ) %>%
+    arrange(desc(time)) %>%
+    mutate(airb3 = airb2 <1 & !duplicated(airb2 < 1) ) %>%
+    arrange(time)
+}
+
+prep_trj <- function(.trj){
+  trj <- .trj %>% dist_pt_to_pt %>% hold_roll %>% airborne
+}
+
+# determine events
+
+first_and_last_hit <- function(.trj){
+  first <- .trj %>% filter(time == min(time)) %>% select(time, lat, lon) %>%
+    mutate(point = "FIRST")
+  last <- .trj %>% filter(time == max(time)) %>% select(time, lat, lon) %>%
+    mutate(point = "LAST")
+  out <- bind_rows(first, last)
+}
+
+block_off <- function(.trj){
+  aobt <- .trj %>% filter(dist_sum >= 2)
+  aobt <- aobt[1,]  %>% select(time, lat, lon) %>%
+    mutate(point = "AOBT")
+  return(aobt)
+}
+
+take_off_time <- function(.trj){
+  atot <- .trj %>% filter(airb3 == TRUE)
+  atot <- atot %>% select(time, lat, lon) %>%
+    mutate(point = "ATOT")
+}
+
+# extract key events
+
+dep_events <- function(.trj){
+  fst_lst <- first_and_last_hit(.trj)
+  aobt    <- block_off(.trj)
+  atot    <- take_off_time(.trj)
+  out <- bind_rows(fst_lst, aobt, atot)
+}
+
+```
+
+#mydep <- trjs %>% filter(callsign == "EIN65W")
+mydep <- trjs %>% filter(callsign == "DLH6RL")
+#mydep <- trjs %>% filter(callsign == "UZB232")
+#mydep <- trjs %>% filter(callsign == "DLH430")
+mydep <- mydep %>% dist_pt_to_pt %>% hold_roll %>% airborne
+ggplot(data = mydep, aes(x=time, y=airb2)) + geom_path() + theme_minimal() +
+  labs(x="", y="rolling window mean") +
+  annotate("text", x = max(mydep$time) - 300, y = 0.5, label=paste0(unique(mydep$callsign)))
+# ggsave("./figures/rolling-window-mean.png")
+
+filter(mydep, airb3 == TRUE) %>% select(time, velocity, vertrate, onground, baroaltitude, geoaltitude, dist, dist_sum, roll, airb, airb2,airb3) 
+
+mydep[600:615,] %>% select(time, velocity, vertrate, onground, baroaltitude, geoaltitude, dist, dist_sum, roll, airb, airb2,airb3)
+
+
+mydep <- mydep %>% dist_pt_to_pt %>% hold_roll %>% airborne
+ggplot(data = mydep, aes(x=time, y=airb2)) + geom_path()
+res   <- dep_events(mydep)
+res
+
+ds_dep <- ds %>% filter(MVT == "DEP")
+ds_dep <- ds_dep %>% 
+  mutate(data2 = map(.x=data, .f=~prep_trj(.x))) %>%
+  mutate(out   = map(.x=data2,.f=~dep_events(.x)))
+
+res <- ds_dep %>% select(icao24, callsign, out) %>% 
+  tidyr::unnest(cols="out") %>%
+  tidyr::pivot_wider(names_from=point, names_prefix="", values_from=time)
+  
+
