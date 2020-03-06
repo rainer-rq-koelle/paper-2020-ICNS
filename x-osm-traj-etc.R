@@ -1,14 +1,62 @@
+library(tidyverse)
+library(readr)
 library(osn)
 
+# Losvce1300
 # from home skip host, etc
-session <- osn_connect("espin", host = "localhost", port = 6666)
+# session <- osn_connect("espin")
+# from work
+# 1. go to putty, 2. select / load magic and add password
+# session <- osn_connect("espin", host = "localhost", port = 6666)
+
 sv <- state_vector(
   session,
   icao24 = NULL,
-  wef = "2019-04-22 09:00:00",
-  til = "2019-04-22 10:00:00",
+  wef = "2019-04-22 16:00:00",
+  til = "2019-04-22 17:00:00",
   bbox = c(xmin = 7.536746, xmax = 9.604390, ymin = 49.36732, ymax = 50.69920)
 )
+
+# Sam's function for EDDF mit radius 50NM
+# xmin      xmax      ymin      ymax 
+#7.246979  9.839271 49.193649 50.859193 
+
+# last attempt - check also downloaded files: extracting 2019-04-29 04:00:00
+
+rq <- seq(as.POSIXct("2019-04-29 04:00:00",tz="UTC"), as.POSIXct("2019-05-05 23:00:00",tz="UTC"), by="hour")
+
+query_osn <- function(.start_date, .session = session){
+  start_date <- .start_date
+  session    <- .session
+  message(paste("extracting ", start_date, sep = ""))
+
+  bbox_eddf_trjs <- c(xmin = 7.536746, xmax = 9.604390, ymin = 49.36732, ymax = 50.69920)
+#start_date <- lubridate::ymd_hms("2019-04-22 11:00:00", tz="UTC")
+
+end_date   <- start_date + lubridate::hours(1)
+start_hr   <- lubridate::hour(start_date)
+end_hr     <- start_hr + 1
+
+start_date_c <- as.character(start_date)
+end_date_c   <- as.character(end_date)
+
+file_name <- paste("./data-src/adsb_eddf_"
+                   , lubridate::date(start_date),"_", sprintf("%02d",start_hr), "00-"
+                   , sprintf("%02d",end_hr),"00.csv", sep="")
+
+sv <- state_vector(
+  session, icao24 = NULL
+  , wef = start_date_c
+  , til = end_date_c
+  ,bbox = bbox_eddf_trjs
+  )
+
+readr::write_csv(sv, file_name )
+
+}
+
+
+#rq %>% purrr::walk(.f=~query_osn(.))
 
 
 library(ggplot2)

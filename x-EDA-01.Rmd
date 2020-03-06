@@ -47,23 +47,40 @@ trjs <- read_csv(
   ))
 ```
 
+
+
+
+
 TO-DO add osm functions
 
 ```{r}
+arp_eddf <- geom_point(data = data.frame(lon = 8.56 , lat =50.03 ), aes(x = lon, y = lat), color = "purple", size = 5)
 eddf_ad <- osm_apt(.bb_lonlat = c(8.479385,49.989753,8.616028,50.055596))
-eddf_ad
+eddf_ad + arp_eddf
 ```
 
+arp_eddf <- geom_point(data = data.frame(lon = 8.56 , lat =50.03 ), aes(x = lon, y = lat), color = "purple", size = 5)
++ xlim(8.52, 8.61) + ylim(50, 50.055)
 
 What to do with the trajectories - good candidates for stand identification
+
+lu <- read_csv("../__DATA/EDDF/EDDF_2019_FACT.csv")
+lu <- lu %>% filter(SRC_PHASE == "ARR") %>% mutate(TIME = lubridate::dmy_hms(MVT_TIME_UTC, tz="UTC"), DOF = lubridate::date(TIME) ) %>% filter(DOF == as.Date("2019-04-22")) %>% select(FLTID = AP_C_FLTID, REG = AP_C_REG, ADEP_ICAO, ADES_ICAO, MVT_TIME_UTC, BLOCK_TIME_UTC, TIME, DOF, SRC_PHASE)
+
+lu %>% filter(TIME >= lubridate::ymd_hms("2019-04-22 09:00:00", tz="UTC"), TIME <= lubridate::ymd_hms("2019-04-22 10:00:00", tz="UTC"))
 
 ```{r}
 trjs <- trjs %>%
   mutate(time = as_datetime(time))
 
-payload <- trjs %>% group_by(icao24, callsign) %>% summarise(N = n(), GND = sum(onground == TRUE)) %>% arrange(desc(N)) %>% ungroup() %>% filter(GND != 0)
+payload <- trjs %>% group_by(icao24, callsign) %>% 
+  summarise(N = n(), GND = sum(onground == TRUE), AIRB = sum(onground == FALSE)) %>% 
+  arrange(desc(N)) %>% ungroup() %>% filter(GND != 0)
 
-trjs <- trjs %>% right_join(payload, by=c("icao24","callsign"))
+# extract some flights with ongrounds
+payload %>% filter(GND != 0) %>% sample_n(10)
+
+rq <- trjs %>% right_join(payload, by=c("icao24","callsign"))
 
 ds <- trjs %>% filter(icao24 %in% payload$icao24[10])
 ```
@@ -72,4 +89,11 @@ ds <- trjs %>% filter(icao24 %in% payload$icao24[10])
 ggplot(data = ds, mapping = aes(x = lon, y = lat, color = icao24)) + 
   geom_point() +
   xlim(8.52, 8.61) + ylim(50, 50.055)
+  
+  
+flts <- c("EIN65W","DLH5RJ","DLH8HP","DLH4YY","DLH695","DLH75U","AAL71","ETD25T","ROT302P")
+
+stat_plot <- ggplot(data = mt, aes(x = lon, y = lat, color=icao24)) + geom_point() + arp_eddf + xlim(8.52, 8.61) + ylim(50, 50.055)
+> anim_plot <- stat_plot + gganimate::transition_time(time)
+> anim_plot
   

@@ -1,14 +1,14 @@
 ---
 title: "Operational Performance Analyses at European Airports with Community-Collected Open Data"
-author: "RQ"
-date: "02/02/2020"
+author: "Antonio Lazarovski, ATOS, Brussels, Belgium \\n Enrico Spinielli and Rainer Koelle, EUROCONTROL, Brussels, Belgium"
 output:
+  bookdown::word_document2:
+    toc: false
   bookdown::pdf_document2:
     toc: false
   html_document:
     df_print: paged
-  word_document: default
-abstract: My abstract
+#abstract: My abstract
 bibliography: paperxx.bib
 ---
 
@@ -16,10 +16,25 @@ bibliography: paperxx.bib
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-...
-Major transformation programmes are underway across the globe and are now deployed at various locations. The impact of air transportation and air navigation system performance at airports has gained high visibility. Growth projections at major airports highlight the need for higher levels of efficiency. However, access to operational data to validate the research or business claims, or even validate the observed performance benefits is limited. 
-... 
-This paper studies the operational benefits of two recent deployments for enhanced arrival management practices within the European context. In particular, the point-merge procedure is contrasted with extended arrival management and delay absorption outside the terminal airspace. The operational data is extracted from community fed open data sources. Data from a community network for ADSB and multi-lateration based surveillance data serves as input to advanced data analytics (e.g. machine learning) to augment the current set of performance indicators. The use case analyses are compared to the regular performance monitoring in Europe and the current proposed GANP performance measures. The results obtained confirm the general feasibility of applying and combining open data sources for performance analyses within the airport context. This provides a toolset that enables the validation of on-going deployment activities and make such analyses accessible to the public, interested researchers or experts, but also in support of the political debate. In particular with a view to the recent discussion on environmental sustainability, the push for reproducibility of claimed or reported performance benefits will call for higher levels of transparency and data access. Furthermore, emerging data analytical paradigms (e.g. machine learning) offer the opportunity to augment the current performance measurement framework. The research presented in this paper covers the work of the Performance Review Unit with a view to establishing an open performance reference trajectory for operational analysis. With the emergence of community collected and widely shared air transportation data, the focus will shift away from data inaccessibility to transparency and reproducibility of the data analyses. In this respect the work is also in support of developing an eco-system for operational performance analyses under the umbrella of the ICAO GANP work on performance.
+# Abstract
+
+The continued growth of air transportation is posing political and societal challenges. 
+At the same time major transformation programmes are underway across the globe with a view to enhance the efficiency of air transportation and reduce the environmental footprint.
+Following their development initial concepts and technological enablers are now deployed at various locations. 
+In particular, the impact of air transportation and air navigation system performance at airports has gained high visibility. Growth projections at major airports highlight the need for higher levels of efficiency. However, access to operational data to validate the research or business claims, or even validate the observed performance benefits is limited. 
+
+This paper studies the use of open data to close the gap and remove the information imbalance between air traffic managment and pubic debate. 
+The work focuses on how the operational efficiency of airport airside operations, including the potential benefit of the recent introduction of enhanced arrival management practices within the European context can be measured.
+The operational data is extracted from community fed open data sources. 
+Data from a community network for ADSB and multi-lateration based surveillance data serves as input to advanced data analytics to augment the current set of performance indicators. 
+The use case analyses are compared to the regular performance monitoring in Europe and the current proposed GANP performance measures. 
+The results obtained confirm the general feasibility of applying and combining open data sources for performance analyses within the airport context. 
+This provides a toolset that enables the validation of on-going deployment activities and make such analyses accessible to the public, interested researchers or experts, but also in support of the political debate. 
+In particular with a view to the recent discussion on environmental sustainability, the push for reproducibility of claimed or reported performance benefits will call for higher levels of transparency and data access. 
+Furthermore, emerging data analytical paradigms offer the opportunity to augment the current performance measurement framework. 
+The research presented in this paper covers the work of the Performance Review Unit with a view to establishing an open performance reference trajectory for operational analysis. 
+With the emergence of community collected and widely shared air transportation data, the focus will shift away from data inaccessibility to transparency and reproducibility of the data analyses. 
+In this respect the work is also in support of developing an eco-system for operational performance analyses under the umbrella of the ICAO GANP work on performance.
 
 # Introduction
 
