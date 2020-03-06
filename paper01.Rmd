@@ -111,7 +111,7 @@ Different disciplines and reknown journals are increasingly requiring authors to
 
 Within air transportation and air traffic management research the concept of reproducibility is still in its early infancy stage.
 The topic was first articulated at the 2017 ATM Seminar.
-Spinielli and Koelle published a paper demonstrating the replicability of the research pipeline in XXX. The paper and its underlying data is openly available via https://XXX.
+Spinielli and Koelle published a paper demonstrating the replicability of the research pipeline in XXX. The paper and its underlying data is openly available via https://github.com/rainer-rq-koelle/paper-2020-ICNS.
 During the SESAR Innovation Days, December 2019, a wider discussion took place about the availability of data for research.
 
 Within the field of air transportation and air traffic initial implementations are emerging.
@@ -179,6 +179,29 @@ The information can be used to draw the aerodrome layout depicted in Fig. \@ref(
 knitr::include_graphics("figures/EHAM.png")
 ```
 
+## Trajectory Data Coverage
+
+For this study data from Opensky Network was downloaded for Frankfurt Rhine/Main airport, EDDF.
+The downloaded data covered a period of XX weeks, i.e. 22. April - XX May.
+
+```{r}
+
+```
+
+The ADSB trajectory data is downloaded from Opensky Network in form of so-called *state vectors*.
+A state vector comprises the information associated with the aircraft ICAO 24-bit address.
+It represents a time-binned representation of the flight derived from ADSB and Mode-S messages.
+The Opensky Network API is documented at https://opensky-network.org/apidoc/rest.html.
+
+(ref:rolling-window) Determination of the Actual Take-Off Time
+
+```{r rolling-window, fig.cap="(ref:rolling-window)", out.width="50%", fig.pos="h", echo=FALSE}
+knitr::include_graphics("figures/rolling-window-mean.png")
+```
+
+Fig. \@ref:(fig:rolling-window) shows an example for the determination of the taxi-out time.
+To counter the problem of noisy onground flags a sliding window technique has been used.
+For the departure in question, DLH6RL, several extreme spikes have been observed.
 
 ## Replicating Aerodrome Performance Indicators
 
