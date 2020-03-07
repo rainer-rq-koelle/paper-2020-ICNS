@@ -1,10 +1,12 @@
 ---
 title: "Operational Performance Analyses at European Airports with Community-Collected Open Data"
-author: "Antonio Lazarovski, ATOS, Brussels, Belgium \\n Enrico Spinielli and Rainer Koelle, EUROCONTROL, Brussels, Belgium"
+author: |  # when using the pipe operator do not use any parentheses
+  | Antonio Lazarovski, ATOS, Brussels, Belgium 
+  | Enrico Spinielli and Rainer Koelle, EUROCONTROL, Brussels, Belgium
 output:
-  bookdown::word_document2:
-    toc: false
   bookdown::pdf_document2:
+    toc: false
+  bookdown::word_document2:
     toc: false
   html_document:
     df_print: paged
@@ -42,7 +44,9 @@ In this respect the work is also in support of developing an eco-system for oper
 
 The continual growth of air transportation is posing political and societal challenges. Throughout the recent years there has been a debate to what extent the funding of the on-going transformation programmes have resulted in tangible system improvements. Prevailing operational limits on one hand, but also the emerging societal pressure in terms of environmental sustainability on the other hand are a concern for political decision-makers and strategic planers. To address the political debate, ICAO is promoting a performance-based approach through its Global Air Navigation Plan (GANP) and associated building blocks of the future air transportation system. The performance-based approach builds on data analytics to increase the transparency in terms of bottleneck identification or observed performance benefits from novel operational concepts or deployed technical enablers. 
 
-Manual on ANS Performance [@icao_doc9883_2009].
+The International Civila Aviation Organization (ICAO) provides high-level guidance on measuring performance in its Manual on ANS Performance [@icao_doc9883_2009].
+This has now been complemented with a set of proposed Key Performance Indicators (KPIs) to harmonise the global approach to measuring performance.
+Within the European context, slight variations of these indicators are used for the regular monitoring under the EUROCONTROL Performance Review System and the Single European Sky Performance and Charging Scheme. 
 
 To meet the challenges of the continual growth, major transformation programmes are underway across the globe and the last years have seen a series of deployments at various locations. 
 With the increasing focus on XXXX however, the access to supporting data and results is often limited. 
@@ -54,7 +58,7 @@ Recent advances in artificial intelligence and machine learning can benefit from
 
 The reproducibility paradigm and data sharing philosophy are a cornerstone of advancing the state of the art.
 
-For example, @schultz_2020 postulate an ADSB-lite concept with a view to the costs involved in implementing airport collaborative decision-making (ACDM) at smaller airports.
+For example, @schultz_2020 postulates an ADSB-lite concept with a view to the costs involved in implementing airport collaborative decision-making (ACDM) at smaller airports.
 @olive_2019 developed a toolbox for the analysis of air traffic data.
 The Performance Review Unit (PRU) is actively marketing an open reference trajectory project for the benefit of higher transparency in the operational monitoring of performance in Europe.
 
@@ -66,23 +70,34 @@ The contributions of this paper are as follows:
 
 * an applied use-case of the reproducibility paradigm by providing the paper and underlying data for interested researchers to verify and replicate the results presented in this paper;
 * an initial validation of the fitness of open community collected data for the purpose of performance monitoring and reporting;
-* worked example of replicating performance measures at study airports and develop a measure for delay absorption
-
+* worked example of replicating performance measures at study airports and develop a measure for delay absorption in the en-route phase.
 
 
 # Background/Context
 
 While there never existed a disagreement about the fact that air transport / air traffic engineering requires access to data for developing advanced models or verify and validate reported results, the actual access to the data is traditionally sparse.
+To advance the state-of-the-art, studies and results should be made reproducible to support comparability between studies and diverging conclusions.
+A possible way to do this is to share data and analytical tools, and allow other researchers and practitioners to reproduce the results and validate the conclusions based on the shared work [@koelle_opendata_2017].
 The status and access to data in air transportation research has been analysed by @bourgois_2014.
+This study found that a significant part of air traffic data is collected and archived by state organizations.
+Within the operational context the data is kept in line with prevailing safety rules and requirements. 
+Technical support and research groups may store the data for longer periods with a view of reusing the data for different projects. 
+Data sharing policies limit the wider use or open sharing of data.
+This also applies to transformation programs like SESAR in Europe and NextGen in the United States.
+Developments are widely marketed in news outlets and flyers. 
+However, traffic samples used in the associated simulations or live demonstrations are typically not made available publicly.
+Although more recent initiatives require recipients of public funding to share data many research programs allow grantees to opt-out on grounds of intellectual property rights, declared sensitivity of the data, or when the sharing of data poses a risk to the project or national/organizational security.
 
 <!-- emergence of open data and communities -->
 The emergence of aviation related communities of interest is closely linked with the pervasive use of the internet.
-By tradition there have always been aviation enthusiasts and techy-savvy individuals interested in the data communication of aircraft [@koelle_opendata_2017].
-The first group's focus was on photography. The latter on signal detection and reception.
+By tradition there have always been aviation enthusiasts and techy-savvy individuals interested in many facets of aviation and the air-ground data communication of aircraft [@koelle_opendata_2017].
+It is impossible to list all fields aviation enthusiasts engage with. Activities entails aircraft spotting, aircraft information (e.g. life-cycle) archiving, airports and airlines statistics.
+The second group's focus is on signal detection and reception. Originally starting off with aircraft messaging and air traffic control radio telephony.
 
-Further applications developed and were supported by web-collaboration. For example, establishing a repository of aircraft utilisation by tracking the aircraft from its roll-out and test flights to retirement.
+Further applications developed and were supported by web-collaboration and crowd-sourcing. 
+For example, establishing a repository of aircraft utilisation by tracking the aircraft from its roll-out and test flights to retirement.
 
-Another driving force accelerating the developments is the simulation community.
+Another driving force accelerating the developments is the flight simulation community.
 The advent of highly configurable flight simulator software resulted in large-scale developments establishing realistic scenario support for the software.
 This includes an ever increasing set of virtual replicas of airports to provide the gamer with the respective context.
 
@@ -95,24 +110,42 @@ In the latter domain the regulatory context is still an obstacle for the wider u
 In most of the European countries, flight planning is only considered 
 
 Outside the aviation community similar developments took place. 
-(VERBATIM) OpenStreetMap is a free, editable map of the whole world that is being built by volunteers largely from scratch and released with an open-content license.(VERBATIM)
-
-*
-
-*
-
+From a geographic information perspective Google maps (https://www.google.com/maps) revolutionized the way cartographic information is accessible to the public. 
+However, there are license rights and potential access limits that constrain the use of google maps for other applications. 
+OpenStreetMap (https://www.openstreetmap.org/) originates back to 2004 when many geographic information data sources were owned and controlled by government organisations. 
+The idea behind OpenStreetMap builds on a free and community crowdsourced model in comparison to Google maps.
+The editable map is built by the community and released with an open-content license.
 
 # Methodology
 
 ## Reproducible Research and Analysis
 
 Throughout the recent years the call for reproducibility has gained a higher momentum.
-Different disciplines and reknown journals are increasingly requiring authors to provide the data next to the publication.
+While reproducibility is a fundamental trait of research and the scientific method, many scientific studies are difficult to validate. 
+As mentioned above, this equally applies to the air traffic management domain.
+A key motivation for reproducibility is the open expossure of the data and methods. This enables a dialogue and discourse with interested researchers or professionals. Moreover, this dialogue supports the identification of potential logical or mathematical flaws.
+For example, spectacular omissions and mistakes have been oberved in psychology, biomedical science, and medicine. This is highlighted in @harris_2017, but the lessons learned can be translated to other disciplines. 
+Accordingly, different disciplines and reknown journals are increasingly requiring authors to provide the data next to the publication.
+With Fig. \@ref(fig:reproducibility-spectrum) this is a move towards more reproducible results.
+
+(ref:reproducibility-spectrum) Reproducibility (c.f. [@marwick_reprospectrum_2017])
+
+```{r reproducibility-spectrum, fig.cap="(ref:reproducibility-spectrum)", out.width="100%", fig.pos="ht", echo=FALSE}
+knitr::include_graphics("figures/reproducibility-spectrum.png")
+```
 
 Within air transportation and air traffic management research the concept of reproducibility is still in its early infancy stage.
-The topic was first articulated at the 2017 ATM Seminar.
-Spinielli and Koelle published a paper demonstrating the replicability of the research pipeline in XXX. The paper and its underlying data is openly available via https://github.com/rainer-rq-koelle/paper-2020-ICNS.
+The topic was first articulated at the 2017 ATM Seminar in Seattle.
+Spinielli and Koelle published a paper demonstrating the replicability of the research pipeline in XXX. 
+Following this thread, the draft of this paper and its underlying data is openly available via https://github.com/rainer-rq-koelle/paper-2020-ICNS. The repository also entails supporting documentation to enable a researcher to reproduce the results and verify the used methods and mathematical transformations.
+During the 1st Conference on Artificial Intelligence and Data Analytics in Air Transportation (February 2020, Singapore) a good part of the papers pointed to respective repositories on github or other web platforms supporting the sharing of the underlying data and code.
+
+
+
 During the SESAR Innovation Days, December 2019, a wider discussion took place about the availability of data for research.
+This is combined with a wider call to open data for air transportation and air traffic management research.
+
+
 
 Within the field of air transportation and air traffic initial implementations are emerging.
 Related to our work is **traffic**, a Python based toolbox for the trajectory based analytics [@olive_2019].
@@ -135,16 +168,19 @@ knitr::include_graphics("figures/architecture-traffic-toolbox.png")
 ```
 
 
-This paper utilises the aircraft data base developed by @sun_adsbdb_2020.
+This paper utilises the aircraft data base developed by @sun_adsbdb_2020 and @osn_2014.
+Both data bases are built on the received identifications transmitted by aircraft.
+Next to the unique ICAO 24-bit id and aircraft registration, both data bases contain additional meta-information, e.g. aircraft type, operator.
+For the comparison of the open data with the EUROCONTROL performance monitoring data the 24-bit address, registration, and aircraft type had been used as matching keys.
 
 ADSB data provides for measured signals that support the reconstruction of actual flown trajectories.
-(VERBATIM)Trajectories are mathematical objects used to describe the evolution of a moving object with
-a finite list of parameters [@olive_2019] (END VERBATIM).
+Trajectories are a mathematical mapping describing the temporal-spatial motion of objects with
+a finite list of parameters [@olive_2019]. 
+In particular, a trajectory is a mapping function from the temporal space, $T \subseteq \mathbb{R}$, to the three dimensional geographical space $\mathbb{R}^3$.
 We generalise the concept of a trajecory to a single flight of an aircraft from its departure (ADEP) to destination (ADEP) aerodrome. The trajectory is described as a set of 4-positions, i.e. timestamp indexed latitude, longetude, and altitude information.
 
-
-
-Opensky Network state vector provides the following trajectory features:
+For the first part of this paper we use community-fed ADSB data downloaded from Opensky Network.
+The API provides an interface to access so-called state vectors which provide the following trajectory features:
 
 * aircraft identification
 * timestamp
@@ -152,6 +188,13 @@ Opensky Network state vector provides the following trajectory features:
 
 The data comprises also fields for ground speed, track angle and vertical rate. 
 
+The state vectors combine different ADSB messages received throughout the sampling cycle and are available with a one-second update rate. 
+Different message types are used during flight and on the ground to transmit the aircraft position and status.
+For example, for position and altitude during flight, the aircraft transmits **airborne position messages** (types 9 - 18 or 20 - 22) and **airborne velocity** is transmitted as message type 19. While operating on the ground, message types 5-8 transmit both **surface position** and movement. According to the ADSB message standard there is no altitude information in message types 5-8. The set of messages also offer an on/off-ground flag [@sun_adsbbook_2017]. Dependent on the processing of the data and its aggregation in the state vector, various combinations of altitude information and on/off-ground have been seen for different aircraft. 
+The noise effect may also be the result of garbled messages or signal distortions and interference.
+The second part of this paper makes use of Correlated Position Reports (CPR). CPRs are service provider reported postions offering the same features as the ADSB/multilateration data. 
+CPRs are sampled on a 30 second basis and represent a widely pre-processed data set. 
+The longer-term assessment performed did not allow to make use of the ADSB data as the download of multiple years would have been prohibitive. 
 
 
 ACDM-lite [@schultz_acdmlite_2019, @schultz_2020]
