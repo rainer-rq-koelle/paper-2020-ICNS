@@ -112,7 +112,7 @@ In most of the European countries, flight planning is only considered
 Outside the aviation community similar developments took place. 
 From a geographic information perspective Google maps (https://www.google.com/maps) revolutionized the way cartographic information is accessible to the public. 
 However, there are license rights and potential access limits that constrain the use of google maps for other applications. 
-OpenStreetMap (https://www.openstreetmap.org/) originates back to 2004 when many geographic information data sources were owned and controlled by government organisations. 
+OpenStreetMap (https://www.openstreetmap.org/) originates back to 2004 when many geographic information data sources were owned and controlled by government organisations [@osm_2020]. 
 The idea behind OpenStreetMap builds on a free and community crowdsourced model in comparison to Google maps.
 The editable map is built by the community and released with an open-content license.
 
@@ -150,21 +150,19 @@ This is combined with a wider call to open data for air transportation and air t
 Within the field of air transportation and air traffic initial implementations are emerging.
 Related to our work is **traffic**, a Python based toolbox for the trajectory based analytics [@olive_2019].
 
-## Process
-
-* add figure of workflow
-
 ## Approach
 
+<!-- 
 * develop diagram showing activities (left col), results/findings (middle col), and contributions (right col)
 * or schematic about artefacts (c.f. paper with data model shared with Martin/OSN and Enrico)
+-->
 
-Fig. \@ref(fig:approach-toolbox) shows SOMETHING COOL.
+Fig. \@ref(fig:approach-study) depicts the principal approach chosen for this feasibility study.
 
-(ref:approach-toolbox) Overview of the Approach
+(ref:approach-study) Overview of the approach
 
-```{r approach-toolbox, fig.cap="(ref:approach-toolbox)", out.width="50%", fig.pos="ht", echo=FALSE}
-knitr::include_graphics("figures/architecture-traffic-toolbox.png")
+```{r approach-study, fig.cap="(ref:approach-study)", out.width="50%", fig.pos="ht", echo=FALSE}
+knitr::include_graphics("figures/architecture-study.png")
 ```
 
 
@@ -213,8 +211,9 @@ For this paper we defaulted for the aerodrome charting to OpenStreetMap.
 For the interested reader, the principal cartographic information available via OpenStreetMap can be queried via an online viewer (https://overpass-turbo.eu/). By visual inspection a first impression of the available information can be gained.
 
 To further automate the data extraction we developed a query to define a bounding box around the aerodrome reference point.
-With these dimensions the following code extract the data from the OpenStreetMap server.
+With these dimensions the following code extracts the data from the OpenStreetMap server.
 The information can be used to draw the aerodrome layout depicted in Fig. \@ref(fig:aerodrome-chart).
+As part of the geopgraphic information also stand identification can be retrived from OpenStreetMap (c.f. Fig. \@ref(fig:aerodrome-zoom-stands)).
 
 (ref:aerodrome-chart) Example of an aerodrome chart, i.e. Amsterdam Schiphol (EHAM)
 
@@ -222,19 +221,54 @@ The information can be used to draw the aerodrome layout depicted in Fig. \@ref(
 knitr::include_graphics("figures/EHAM.png")
 ```
 
-## Trajectory Data Coverage
+(ref:aerodrome-zoom-stands) Information on stand/gate from OpenStreetMap [@osm_2020]. 
 
-For this study data from Opensky Network was downloaded for Frankfurt Rhine/Main airport, EDDF.
-The downloaded data covered a period of XX weeks, i.e. 22. April - XX May.
-
-```{r}
-
+```{r aerodrome-zoom-stands, fig.cap="(ref:aerodrome-zoom-stands)", out.width="50%", fig.pos="h", echo=FALSE}
+knitr::include_graphics("figures/osm-zoom-eddf-terminal1.png")
 ```
 
+The OSM data specification entails slots for labelling geographic data points.
+
+## Trajectory Data Coverage
+
+For this study data from Opensky Network was downloaded for Frankfurt Rhine/Main airport, EDDF, and Dublin airport(EIDW).
+The downloaded data covered a period of 4 weeks, i.e. 22. April - 19 May.
 The ADSB trajectory data is downloaded from Opensky Network in form of so-called *state vectors*.
 A state vector comprises the information associated with the aircraft ICAO 24-bit address.
 It represents a time-binned representation of the flight derived from ADSB and Mode-S messages.
 The Opensky Network API is documented at https://opensky-network.org/apidoc/rest.html.
+The interface supports the download of specific aircraft icao24 identifications or the batch download of all data within a specific bounding box. 
+Fig. \@ref(fig:download-eidw) shows the number of 4D positions downloaded from Opensky Network for the first day of this study, i.e. 22. April 2019.
+The distributions shows that a significant number of distinct unique aircraft id codes with a low number of 4D positions has been downloaded. 
+By definition such flights are likely to be overflights transversing the area of the defined bounding box.
+
+(ref:download-eidw) Number of position reports downloaded for EIDW (22. April 2019)
+
+```{r download-eidw, fig.cap="(ref:download-eidw)", out.width="50%",fig.pos="h", echo=FALSE}
+knitr::include_graphics("./figures/osn_msg_eidw_20190422.png")
+```
+
+The downloaded data provides for 4D positions. For the calculation of performance indicators respective timestamps marking specific movements events needed to be generated.
+These events include:
+
+* first and last position - identification of the first and last measured position to support the identification of coverage or filter data 
+* surface movement events - given the coverage, identification of start of taxi, end of taxi, and runway movement times, i.e. actual take-off time in case of departures and actual landing time in case of arrivals.
+
+Although the ADSB standard suggests a clear cut-off of altitude information during the ground part of a trajectory, the data contained various combinations of data for altitude, velocity, vertical rate, and onground flag. 
+To reduce the number of case distinctions, a sliding window approach has been used to identify the runway movement event.
+Fig. \@ref:(fig:rolling-window) shows an example for the determination of the actual take-off time.
+For the departure in question, DLH6RL, several extreme spikes have been observed during the taxi portion.
+The sliding window allowed to smoothen out the noisy onground and altitude information allowing the identification of a clear cut-off for the actual take-off.
+The shown examples uses a window size of n = 11 successive postion reports (1 second) calculating the mean (simple moving average):
+
+\begin{equation}     
+isTakeOff =\frac{\sum^{n-1}_{i=0}{  isTakeOff_i }}{n}
+(\#eq:sma)
+\end{equation}
+
+
+A veriety of other smoothing approaches were tested, however, given the nature of the data and balancing processing time for large datasets, the simple moving average \@ref(eq:sma) provides robust results.
+
 
 (ref:rolling-window) Determination of the Actual Take-Off Time
 
@@ -242,9 +276,7 @@ The Opensky Network API is documented at https://opensky-network.org/apidoc/rest
 knitr::include_graphics("figures/rolling-window-mean.png")
 ```
 
-Fig. \@ref:(fig:rolling-window) shows an example for the determination of the taxi-out time.
-To counter the problem of noisy onground flags a sliding window technique has been used.
-For the departure in question, DLH6RL, several extreme spikes have been observed.
+
 
 ## Replicating Aerodrome Performance Indicators
 
@@ -262,7 +294,41 @@ avgAddTXOT =\frac{\sum_{f_i}{  actualTXOT_i - refTXOT_{(stand,rwy)}  }}{\sum_{f_
 see \@ref(eq:addTXOT)
 
 
-# Results - arrival management (point merge vs delay absorption)
+# Results - arrival management (en-route delay absorption)
+
+With this feasibility study an approach to the measurement of enroute delay absorption is performed.
+As mentioned above, the following results are based on CPRs.
+Conceptually, en-route delay absorptions is designed to reduce the required sequencing within the terminal area (approximated by the ASMA 40NM cylinder).
+Associated sequencing time (e.g. procedural holding, point merge procedures, vectoring) is escalated upstream in terms of speed reductions.
+This allows to operate the aircraft within certain margins of its operational envelope at higher altitudes with considerable lower fuel burn than holding or vectoring at lower altitudes.
+For this purpose a Deceleration Indicator for flight PairS (DIPS) has been created to monitor arrival management performance.
+At the time being so-called arrival manager systems (AMAN) and extend arrival management systems (XMAN) are deployed for major European airports. 
+
+The indicator considers pairs of aircraft, arriving on the same airport, one after the other. To measure performance in the terminal arrival space around an airport 4 intermediate sequencing horizons have been defined in relation to the aerodrome reference point:
+
+* horizon III: airspace ranging from 400NM to 200NM;
+* horizon II: airspace ranging from 200NM to 100NM;
+* horizon I: airspace ranging from 40NM to 100NM; and
+* terminal airspace: airspace ranging from 40NM to 8NM.
+
+The 8NM intersection serves as a proxy for the ILS intersection which is considered the end point for the delay absorption. 
+Once an aircraft is established on its final approach flight sequencing is typically limited to the safety of flight or emergency handling.
+
+Similar to the additional ASMA time indicator introduced above, flights landing on the airport are grouped per landing runway. Their relationship is expressed in terms of leader and follower per sequence of landing. 
+The 4D flight profile attributes for a flight are captured whenever it enters an area of interest. 
+For a couple of flights this means that whenever a leader crosses an area of interest its attributes are noted. Also, the attributes for the follower are captured for the same moment when the leader crossed the threshold of the area. In this way, it is possible to monitor the paramaters of the leader versus the follower throughout a time period.
+DIPS is defined as the ratio between the deceleration of the follower versus the deceleration of the leader taking into account the same time interval. So, if a leader crossed the 400 NM threshold at t1 point in time, and then flew over the 200 Nm threshold at t2 point in time, then DIPS measures the sum of deceleration from t1 to t1 for the leader, and then calculates the sum of deceleration of the follower in the time period from t1 to t2, and present the ratio between the two.
+Overall it is expected that the indicator will show an increasing trend if the follower is being slowed down more than the leader is being slowed down and vice versa.
+Fig. \@ref(fig:dips) shows the concept of the decelartion indicator.
+
+(ref:dips) Deceleration indicator concept
+
+```{r dips, fig.cap="(ref:dips)", out.width="50%", fig.pos="h", echo=FALSE}
+knitr::include_graphics("figures/dips.png")
+```
+
+
+
 
 # Conclusions
 
@@ -287,7 +353,8 @@ The views expressed in this paper are the authors' own and do not reflect a posi
 # Acknowledgments
 
 This work was conducted under the auspices of the Performance Review Commission of EUROCONTROL and the preparatory action of establishing an open reference trajectory for performance monnitoring in Europe.
-The authors further want to thank the Opensky-Network community 
+The authors further want to thank the Opensky-Network community.
+Thansk go also to OpenStreetmap. Map data copyrighted OpenStreetMap contributors and available from https://www.openstreetmap.org.
 
 # Reproducibility
 

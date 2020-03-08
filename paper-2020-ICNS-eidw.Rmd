@@ -1,0 +1,373 @@
+---
+title: "paper01-EIDW.Rmd"
+author: "RQ"
+date: "06/03/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(lubridate)
+library(tidyr)
+library(purrr)
+```
+
+# Overview
+
+This Rmarkdown file summarises the data preparatory action for the ICNS paper.
+This document is based on the analysis of data for EIDW.
+
+# Load Study Data
+
+```{r}
+cols_osn_sv <- cols(
+  time = col_double(),
+  icao24 = col_character(),
+  lat = col_double(),
+  lon = col_double(),
+  velocity = col_double(),
+  heading = col_double(),
+  vertrate = col_double(),
+  callsign = col_character(),
+  onground = col_logical(),
+  alert = col_logical(),
+  spi = col_logical(),
+  squawk = col_character(),
+  baroaltitude = col_double(),
+  geoaltitude = col_double(),
+  lastposupdate = col_double(),
+  lastcontact = col_double(),
+  hour = col_double()
+)
+
+# extract filenames from data source folder
+list_data <- function(.apt_icao, .date, .path="./data-src/"){
+    files <- list.files(path = .path, pattern = paste0("adsb_", .apt_icao, "_", .date))
+    #files <- files[grepl(pattern = .date, files)]
+    return(files)
+}
+
+# load data files listed in files
+load_data <- function(.files, .path="./data-src/", .cols=cols_osn_sv){
+ df <- .files %>%
+    purrr::map(   function(x){  readr::read_csv(paste0(.path, x), col_types = .cols)  }   )
+ return(df)
+}
+
+# convert timestamps
+coerce_data <- function(.df){
+  df <- .df %>%  purrr::map_df(dplyr::bind_rows)
+  df <- df %>% 
+    mutate( time = lubridate::as_datetime(time)
+           ,hour = lubridate::as_datetime(hour))
+}
+
+load_osn_adsb <- function(.apt_icao, .date, .path="./data-src/", .cols=cols_osn_sv){
+  files <- list_data(.apt_icao, .date, .path)
+  df    <- load_data(files, .path, .cols) %>% coerce_data
+}
+```
+
+Read in the first day for this study.
+Need to work in days ~ schedule --> otherwise we have multiple day icao24/callsigns (e.g. EIN58R, 22. & 23. April).
+For the final data crunching we have to loop here over each day! ####################### DO NOT FORGET THIS #####
+
+```{r}
+apt <- "eidw"
+dof <- "2019-04-22"
+
+ds  <- load_osn_adsb(apt, dof)
+outs<- ds %>% group_by(icao24, callsign) %>%
+  summarise(N = n())
+```
+
+Number of adsb 4D positions per icao24 and callsign
+
+```{r}
+g <- ggplot(data = outs, mapping = aes(x=N)) + geom_histogram(bins = 300) +
+  theme_minimal() +
+  labs(x = "") +
+  annotate("text", x = 1200, y = 40, label="count of number of positions \n per icao24/callsign tuple \n at EIDW on 22. April 2019", hjust = 0)
+g
+# ggsave("./figures/osn_msg_eidw_20190422.png")
+```
+
+load mapping tables for ADSB and APDF
+
+```{r, message=FALSE}
+eidw_flts <- read_csv("./data/EIDW-study-flts.csv")
+eidw_dof <- read_csv("./data/EIDW-study-dof.csv")
+```
+
+label arrivals and departures
+
+```{r}
+apt <- "eidw"
+dofs <- c( "2019-04-22","2019-04-23","2019-04-24","2019-04-25","2019-04-26","2019-04-27","2019-04-28"
+          ,"2019-04-29","2019-04-30","2019-05-01","2019-05-02","2019-05-03","2019-05-04","2019-05-05"
+          ,"2019-05-06","2019-05-07","2019-05-08","2019-05-09","2019-05-10","2019-05-11","2019-05-12"
+          ,"2019-05-13","2019-05-14","2019-05-15","2019-05-16","2019-05-17","2019-05-18","2019-05-19")
+# iterator over apt and dofs
+it  <- expand.grid(APT = as.character(apt), DOF = dofs)
+
+osn_matched_flts <- function(.apt, .dof, .flts=eidw_flts){
+    message(paste0("run with ", .apt, " and dof: ", .dof))
+    ds  <- load_osn_adsb(.apt, .dof)
+
+  arrdeps <- .flts %>% filter(as.character(DOF) == .dof) %>%
+    filter(!is.na(icao24)) %>% select(-model, -typecode)
+    
+  ds_eidw <- ds %>% group_by(icao24, callsign) %>% 
+    summarise(ADSB_MSG = n()) %>% ungroup
+  ds_eidw <- ds_eidw %>% 
+    inner_join(arrdeps, by=c("icao24", "callsign"="AP_C_FLTID"))
+
+  stats   <- ds_eidw %>% group_by(DOF, SRC_PHASE) %>% 
+    summarise(OSN_N = n())
+}
+
+osn_matchs <- it %>% 
+  purrr::pmap_dfr(.l=., .f=~myfunction(.apt=..1, .dof=..2))
+
+eidw_dof<- eidw_dof %>% left_join(osn_matchs, by = c("DOF", "SRC_PHASE")) %>%
+  mutate(DELTA = OSN_N - N)
+
+# write_csv(eidw_dof, path = "./data/EIDW-study-dof.csv")
+```
+
+```{r}
+ggplot(data=eidw_dof, aes(x=factor(DOF), y=abs(DELTA), group=SRC_PHASE, colour=SRC_PHASE)) + 
+  geom_path() + theme_minimal() +
+  scale_x_discrete(name="", breaks=dofs[c(1,8,15,22,28)], labels=dofs[c(1,8,15,22,28)]) + #, limits)
+  scale_y_continuous(name = "number of non-ADSB coverd flights") +
+  guides(colour=guide_legend(title="flight phase")) +
+  # top right corner
+  theme(legend.justification=c(1,1), legend.position=c(1,1))
+
+#ggsave("EIDW-osn-non-matched.png", path = "./figures")
+```
+
+```{r}
+trim_arrs <- function(.apt = "eidw", .dof="2019-04-22", .flts=eidw_flts){
+  message(paste0("arrivals for ", .apt, " and dof: ", .dof))
+    ds  <- load_osn_adsb(.apt, .dof)
+  
+  todays_arrs <- .flts %>% filter(as.character(DOF) == .dof, SRC_PHASE == "ARR") %>%
+    filter(!is.na(icao24)) %>% select(-model, -typecode)
+  
+  ds <- ds %>% filter(icao24 %in% todays_arrs$icao24 ) %>%
+    inner_join(todays_arrs, by=c("icao24", "callsign"="AP_C_FLTID")) %>%
+    group_by(icao24, callsign)
+  
+  first = ds %>% filter(time == min(time)) %>% 
+    select(icao24, callsign, time, lat, lon, DOF, SRC_PHASE, REG, ARCTYP, AC_CLASS, AP_C_RWY,AP_C_STND) %>%
+    mutate(point = "FIRST")
+  
+  last = ds %>% filter(time == max(time)) %>% 
+    select(icao24, callsign, time, lat, lon)%>%
+    mutate(point = "LAST")
+  
+  # 6nm intersect
+  NMxx = ds %>% mutate(
+    DIST_ARP = geosphere::distHaversine(c(-6.27222222, 53.42444444), cbind(lon, lat), r=3440.1))
+  
+  NM40 <- NMxx %>% filter(DIST_ARP <= 41, DIST_ARP >=39) %>%
+    summarise( time = mean(time, na.rm = TRUE)
+              ,  lat= mean(lat, na.rm = TRUE), lon = mean(lon, na.rm = TRUE)
+              ,DIST_ARP = mean(DIST_ARP, na.rm = TRUE)
+              ) %>% mutate(point = "NM40")
+  
+  NM08 <- NMxx %>% filter(DIST_ARP <= 9, DIST_ARP >=7) %>%
+    summarise( time = mean(time, na.rm = TRUE)
+              ,  lat= mean(lat, na.rm = TRUE), lon = mean(lon, na.rm = TRUE)
+              ,DIST_ARP = mean(DIST_ARP, na.rm = TRUE)
+              ) %>% mutate(point = "NM08")
+  # 40nm intersect
+  out <- bind_rows(first, last, NM40, NM08) %>% arrange(time) %>%
+    fill(DOF, SRC_PHASE, REG, ARCTYP, AC_CLASS, AP_C_RWY, AP_C_STND) %>%
+    ungroup()
+}
+```
+
+```{r}
+arp_eidw <- c(-6.27222222, 53.42444444)
+#( rq <- trim_arrs("eidw","2019-04-22")  )
+
+eidw_analytic_data <- it %>% 
+  purrr::pmap_dfr(.l=., .f=~trim_arrs(.apt=..1, .dof=..2))
+# write out results for EIDW
+# write_csv(eidw_analytic_data, "./data/EIDW_analytic_data.csv")
+```
+
+asma <- eidw_analytic_data %>% group_by(icao24, callsign, DOF) %>%
+  arrange(icao24, callsign, DOF) %>%
+  filter(point == "NM40" | point == "NM08") %>% 
+  ungroup() %>%
+  mutate( BRG = geosphere::bearing(arp_eidw, cbind(lon,lat))
+         ,BRG = (BRG + 360) %% 360  # apply modulo for negative bearings
+         )
+
+# visual inspection - here can ml help?
+brg_cut <-c(0,45,115,170,265,360)  # maybe another cut at 325
+ggplot(data = asma, mapping=aes(x = BRG, fill=AP_C_RWY)) + 
+  geom_histogram(binwidth=5) +
+  geom_vline(xintercept=brg_cut, color="red", linetype="dotted") +
+  xlim(0,360) +
+  theme_minimal() +
+  labs(x="bearing from ARP of TMA entry (40NM)") +
+  guides(fill=guide_legend(title="arrival runway")) +
+  # top right corner
+  theme(legend.justification=c(0.9,1), legend.position=c(0.9,1))
+
+ggsave("EIDW-asma-sectors.png", path="./figures")
+
+================================= stopped here ===============================
+
+
+calc_dist <- function(.trj, .arp){
+  df <- .trj %>% mutate(DIST_ARP = geosphere::distHaversine(.arp), cbind(lon,lat))
+}
+
+
+
+
+```{r, eval=FALSE}
+### THIS IS COSTLY FOR EIDW and 1 day ~ 30 min ################
+### How can we simplify the MVT part #########################
+trjs <- ds %>% group_by(icao24, callsign) %>%
+  tidyr::nest() %>%
+  mutate(
+     N = map(.x = data, .f=~nrow(.x))
+    ,MVT=map(.x = data, .f=~check_arrival(.x, arp_eidw))
+         ) %>%
+  tidyr::unnest(cols="N")
+
+# costly operation save out for next runs
+# saveRDS(trjs, "./data/EIDW-2019-04-22.rds")
+if(!exists("trjs"){
+  trjs <- readRDS("./data/EIDW-2019-04-22.rds")
+}
+```
+
+
+
+
+
+Test on trajectory is arriving or departing traffic
+
+```{r}
+check_arrival <- function(.trj, .arp){ 
+  arp <- c(.arp$lon, .arp$lat)
+  trj <- .trj
+  
+  trj <- trj %>% 
+    arrange(time) %>%
+    mutate(dist_arp = geosphere::distHaversine(arp, cbind(lon, lat)))
+
+first <- trj %>% top_n(-20, time) %>% 
+  summarise( f_time = mean(time, na.rm = TRUE)
+            ,f_dist = mean(dist_arp, na.rm = TRUE)
+            ,f_alt  = mean(geoaltitude, na.rm = TRUE))
+
+last <- trj %>% top_n(20, time)%>% 
+  summarise( l_time = mean(time, na.rm = TRUE)
+            ,l_dist = mean(dist_arp, na.rm = TRUE)
+            ,l_alt  = mean(geoaltitude, na.rm = TRUE))
+
+out = bind_cols(first, last)
+  out <- out %>% 
+    mutate(
+      DIR = case_when(
+        f_dist > 3000 & l_dist > 3000 ~ "FLYBY"
+       ,f_dist > l_dist ~ "INBD"
+       ,f_dist < l_dist ~ "OUTB"
+       ,TRUE ~ "OTH")
+     ,LVL = case_when(
+        f_alt > 1000 & l_alt > 1000 ~ "OVR"
+       ,f_alt > l_alt  ~ "DESC"
+       ,f_alt < l_alt  ~ "CLIMB"
+       ,TRUE ~"OTH"
+      )
+     ,MVT = case_when(
+        DIR == "INBD" & LVL == "DESC"  ~ "ARR"
+       ,DIR == "OUTB" & LVL == "CLIMB" ~ "DEP"
+       ,LVL == "OVR"  ~ "OVR"
+       ,TRUE ~"OTH"
+     )
+    )
+}
+```
+
+```{r}
+arp_eidw <- tibble(icao24 = "EIDW-ARP", lat=53.42444444 , lon=-6.27222222)
+# trj <- ds %>% filter(callsign == "EIN58R")
+# trj <- ds %>% filter(callsign == "EXS18N")
+# trj <- ds %>% filter(callsign == "EWG6BR")
+# trj <- ds %>% filter(callsign == "ETH500") ## TG not yet recognised #####
+# trj <- ds %>% filter(callsign == "IBK1822")  ## interesting baro showing OVR when geo low!
+trj <- ds %>% filter(callsign == "MSR986")
+
+mvt <- check_arrival(trj, arp_eidw)
+mvt
+```
+  
+```{r}  
+ggplot() + 
+  geom_point(data = trj, mapping = aes(x=lon, y=lat)) +
+  geom_point(data = arp_eidw, aes(x=lon, y=lat, colour = "red", size=3)) +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+
+Provide a comparison with APDF
+
+```{r}
+cols_apdf <- cols_only(
+   AP_C_FLTID = col_character()
+  ,AP_C_REG   = col_character()
+  ,ARCTYP = col_character(), AC_CLASS = col_character()
+  ,AP_C_RWY   = col_character()
+  ,AP_C_STND  = col_character()
+ ,MVT_TIME_UTC  = col_datetime(format = "%d%.%m%.%Y %T")
+ ,BLOCK_TIME_UTC= col_datetime(format = "%d%.%m%.%Y %T")
+ ,SCHED_TIME_UTC= col_datetime(format = "%d%.%m%.%Y %T")
+ ,SRC_PHASE = col_character()
+ ,C40_CROSS_TIME= col_datetime(format = "%d%.%m%.%Y %T")
+ ,C40_CROSS_LAT = col_double(), C40_CROSS_LON = col_double(), C40_BEARING = col_double()
+)
+
+apdf <- readr::read_csv2("../__DATA/EIDW/EIDW_2019_FACT.csv", col_types = cols_apdf) %>% 
+  mutate(DOF = as.Date(MVT_TIME_UTC))
+```
+
+Traffic count
+
+```{r}
+tfc_apdf <- apdf  %>%
+  filter(DOF %in% c(as.Date("2019-04-22", tz="UTC"):as.Date("2019-04-23", tz="UTC"))) %>%
+  group_by(DOF, SRC_PHASE) %>%
+  summarise(N = n())
+```
+
+```{r}
+ggplot(data = tfc_apdf, mapping = aes(x=DOF, y=N, group=SRC_PHASE, fill=SRC_PHASE)) +
+  geom_col(position="dodge") + 
+  theme_minimal()
+```
+
+### need to trim apdf for study day !!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+compare results with aircraft database and then combine with apdf
+
+acdb <- read_csv("../__DATA/aircraft/aircraftDatabase.csv")
+acdb <- acdb %>% select(icao24, reg = registration, ac_type = icaoaircrafttype) %>%
+  mutate(reg = gsub("[[:punct:]]", "", reg))
+
+trjs2 <- trjs %>% mutate(MVT2 = map(.x=MVT, .f=function(.x){return(.x$MVT)})) %>% unnest(cols = MVT2)
+trjs2 <- trjs2 %>% left_join(acdb, by = "icao24") 
+
+trjs2
+acdb
+
