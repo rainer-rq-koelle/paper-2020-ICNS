@@ -2,7 +2,7 @@ library(tidyverse)
 library(readr)
 library(osn)
 
-# Losvce1300
+# password removed
 # from home skip host, etc
 # session <- osn_connect("espin")
 # from work
