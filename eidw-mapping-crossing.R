@@ -17,8 +17,8 @@ cols_apdf <- cols_only(
   ,C40_CROSS_LAT = col_double(), C40_CROSS_LON = col_double(),C40_CROSS_FL = col_double()
 )
 
-apdf_src <- read_csv2("../__DATA/EIDW/EIDW_2019_FACT.csv", col_types = cols_apdf)
-#apdf_src <- read_csv2("../__DATA/EDDF/EDDF_2019_FACT.csv", col_types = cols_apdf)
+#apdf_src <- read_csv2("../__DATA/EIDW/EIDW_2019_FACT.csv", col_types = cols_apdf)
+apdf_src <- read_csv2("../__DATA/EDDF/EDDF_2019_FACT.csv", col_types = cols_apdf)
 apdf     <- apdf_src %>% 
   filter( BLOCK_TIME_UTC >= as.POSIXct("2019-04-22 00:00:00", tz="UTC")
          ,BLOCK_TIME_UTC <= as.POSIXct("2019-05-20 00:00:00", tz="UTC")
