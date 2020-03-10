@@ -1,0 +1,224 @@
+---
+title: "paper-2020-ICNS-EDDF"
+author: "RQ"
+date: "09/03/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+source('~/RProjects/paper-2020-ICNS/utility-functions.R')
+```
+
+Read in the first day for this study.
+
+```{r}
+apt <- "eddf"
+dof <- "2019-04-22"
+
+ds  <- load_osn_adsb(apt, dof)
+
+outs<- ds %>% group_by(icao24, callsign) %>%
+  summarise(N = n())
+
+# at EDDF there is a good number for ground vehicles transmitting 
+# ids FRAxx and LEOSxx --> filter out
+outs<- outs %>% filter(N <= 6000)
+```
+
+Number of adsb 4D positions per icao24 and callsign
+
+```{r}
+g <- ggplot(data = outs, mapping = aes(x=N)) + geom_histogram(bins = 300) +
+  theme_minimal() +
+  labs(x = "") +
+  annotate("text", x = 1200, y = 120, label="count of number of positions \n per icao24/callsign tuple \n at EDDF on 22. April 2019 \n filtered to N <= 6000", hjust = 0)
+g
+# ggsave("./figures/osn_msg_eddf_20190422.png")
+```
+
+Select arrivals and departures from EDDF within study horizon
+
+```{r, message=FALSE}
+apt <- "eddf"
+dof <- "2019-04-22"
+
+calc_txo_data <- function(.apt, .dof){
+  message(paste0("calc txot analytic data for ", .apt, "and day: ",.dof))
+apt <- .apt
+dof <- .dof
+ds  <- load_osn_adsb(apt, dof)
+
+flts_eddf <- read_csv("./data/EDDF-study-flts.csv") 
+tdy_deps  <- flts_eddf %>% filter(as.character(DOF) == dof & SRC_PHASE == "DEP")
+ 
+deps_today<- ds %>% filter(icao24 %in% tdy_deps$icao24) %>%
+  mutate(DIST_ARP = geosphere::distHaversine(c(8.5705,50.04), cbind(lon, lat) ) ) %>%
+  group_by(icao24, callsign) %>%
+  filter(time == min(time)) %>%
+  filter(DIST_ARP <= 4000) %>%
+  select(icao24, callsign) %>% ungroup()
+
+deps <- ds %>% inner_join(deps_today) %>% group_by(icao24, callsign) %>%
+  mutate(nx_lon = lag(lon), nx_lat = lag(lat)
+         ,DIST = geosphere::distHaversine(cbind(lon, lat), cbind(nx_lon, nx_lat))
+         ,DIST = ifelse(is.na(DIST), 0, DIST)
+         ,DIST2= cumsum(DIST)
+         ,DIST3= zoo::rollmean(DIST2, 13, fill=0 )
+         )
+
+hits <- deps %>% summarise(N = n())
+  # remove many hit - think about this
+
+first <- deps %>%
+  filter(time == min(time)) %>%
+  mutate(EVENT = "FIRST")
+
+taxi <- deps %>%
+  filter(DIST2 > 2 & DIST3 > 3) %>%
+  filter(time == min(time)) %>%
+  mutate(EVENT = "AOBT") 
+
+airb <- deps %>% 
+  mutate( airb  = ifelse(onground == FALSE, 1, 0)
+        ,airb2 = zoo::rollmean(airb, 19, fill=NA)
+  ) %>%
+    arrange(desc(time)) %>%
+    mutate(airb3 = airb2 <1 & !duplicated(airb2 < 1) ) %>%
+    arrange(time) %>%
+  filter(airb3 == TRUE) %>% mutate(EVENT = "ATOT")
+
+comb <- bind_rows(first, taxi, airb) %>%
+  select(time, icao24, callsign, EVENT) %>%
+  inner_join(hits, by = c("icao24","callsign")) %>%
+  mutate(DOF = dof)
+}
+```
+
+```{r}
+# rq <- calc_txo_data(apt, dof)
+apt <- "eddf"
+dofs <- c( "2019-04-22","2019-04-23","2019-04-24","2019-04-25","2019-04-26","2019-04-27","2019-04-28"
+          ,"2019-04-29","2019-04-30","2019-05-01","2019-05-02","2019-05-03","2019-05-04","2019-05-05"
+          ,"2019-05-06","2019-05-07","2019-05-08","2019-05-09","2019-05-10","2019-05-11","2019-05-12"
+          ,"2019-05-13","2019-05-14","2019-05-15","2019-05-16","2019-05-17","2019-05-18","2019-05-19")
+# iterator over apt and dofs
+it  <- expand.grid(APT = as.character(apt), DOF = dofs)
+
+tx_eddf <- it %>% 
+  purrr::pmap_dfr(.l=., .f=~calc_txo_data(.apt=..1, .dof=..2))
+
+write_csv(rq, "./data/EDDF_analytic_data.csv")
+```
+
+couple results and apdf
+
+```{r}
+cols_flts <- cols(
+  DOF = col_date(format = ""),
+  SRC_PHASE = col_character(),
+  AP_C_FLTID = col_character(),
+  REG = col_character(),
+  ARCTYP = col_character(),
+  AC_CLASS = col_character(),
+  AP_C_RWY = col_character(),
+  AP_C_STND = col_character(),
+  icao24 = col_character(),
+  model = col_character(),
+  typecode = col_character()
+)
+tx_eddf   <- read_csv("./data/EDDF_analytic_data.csv")
+flts_eddf <- read_csv("./data/EDDF-study-flts.csv", col_types = cols_flts) 
+icao_and_reg <- flts_eddf %>% select(icao24, REG) %>% unique() %>% na.omit()
+gate_and_rwy <- flts_eddf %>% select(REG, AP_C_RWY, AP_C_STND, DOF) %>% na.omit()
+
+tx_eddf <- tx_eddf %>% left_join(icao_and_reg, by="icao24") %>%
+  filter(N >= 100)
+tx_eddf <- tx_eddf %>% group_by(icao24, REG, DOF) %>% 
+  arrange(icao24) %>% 
+  pivot_wider(names_from = EVENT, values_from = time)
+
+#tx_eddf <- tx_eddf %>% left_join(gate_and_rwy, by=c("DOF","REG"))
+# shortcut here for paper
+
+out <- tx_eddf %>% ungroup() %>%
+  mutate(TXOT = difftime(ATOT,AOBT,units = "mins")) %>%
+  filter(TXOT > 0, TXOT <=180) 
+
+ref <- out %>% summarise(REF = quantile(TXOT, probs = 0.2))
+
+out <- out %>% mutate(REF = ref$REF
+                      ,ADD_TXOT = TXOT - REF)
+add_txot <- out %>% summarise(TXOT = sum(TXOT, na.rm = TRUE), REF = sum(REF, na.rm=TRUE)
+                         , ADD_TXOT = sum(ADD_TXOT, na.rm = TRUE)
+                         , N = nrow(out)
+                         , N_NA = sum(is.na(ADD_TXOT))
+                         ) %>%
+  mutate(AVG_ADD_TXOT = ADD_TXOT / (2* N))
+
+write_csv(add_txot, "./data/EDDF_analytic_txot.csv")
+```
+
+rq <- tx_eddf %>% group_by(icao24, REG, DOF)
+
+
+
+df <- .trj %>%
+    mutate( airb = ifelse(onground == FALSE, 1, 0)
+           ,airb2 =zoo::rollmean(airb, 19, fill=NA)
+           ) %>%
+    arrange(desc(time)) %>%
+    mutate(airb3 = airb2 <1 & !duplicated(airb2 < 1) ) %>%
+    arrange(time)
+
+
+
+
+
+```{r}
+is_close_and_low <- function(.ds, .arp=c(8.5705,50.04)){
+# arrival: later timestamps near airport and low altitude 
+# departure: early timestamps near airport and low altitude
+  ds <- .ds %>% 
+    arrange(time)%>%
+    mutate(DIST_ARP = geosphere::distHaversine(.arp, cbind(lon, lat) ) ) %>% 
+    group_by(icao24, callsign)
+# check distance and alt
+  first <- ds %>% top_n(15, time) %>%
+    summarise( time     = mean(time    , na.rm = TRUE)
+              ,DIST_ARP = mean(DIST_ARP, na.rm = TRUE)
+              ,ALT      = mean(geoaltitude, na.rm = TRUE)
+              ,ONG      = mean(sum(onground, na.rm = TRUE))
+              ) %>% 
+    mutate(EVENT = "FIRST")
+  last  <- ds %>% arrange(time) %>% top_n(-15, time) %>%
+    summarise( time     = mean(time    , na.rm = TRUE)
+              ,DIST_ARP = mean(DIST_ARP, na.rm = TRUE)
+              ,ALT      = mean(geoaltitude, na.rm = TRUE)
+              ,ONG      = mean(sum(onground, na.rm = TRUE))
+              ) %>% 
+    mutate(EVENT = "LAST")
+  return(bind_rows(first, last))
+}
+```
+
+# remove overflights -------------------------
+  ovr <- ds %>% group_by(icao24, callsign) %>% 
+    summarise( GEO_ALT_MIN = min(geoaltitude, na.rm = TRUE)
+              ,GEO_ALT_NA  = sum(is.na(geoaltitude))
+              , N          = n()) %>%
+    filter(GEO_ALT_MIN >=5000, GEO_ALT_NA / N < 0.4) %>%
+    ungroup %>% select(icao24, callsign)
+  ds <- ds %>% anti_join(ovr, by=c("icao24","callsign"))
+
+
+pick_daily_deps <- function(.ds, .dof, .flts){
+  flts <- .flts %>% filter(DOF == .dof)
+  flts_deps <- flts %>% filter(SRC_PHASE == "DEP")
+  
+  ds <- .ds %>% filter(icao24 %in% flts_deps$icao24)
+}
+
+
+
+

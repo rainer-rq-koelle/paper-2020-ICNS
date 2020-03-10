@@ -4,9 +4,10 @@ author: |  # when using the pipe operator do not use any parentheses
   | Antonio Lazarovski, ATOS, Brussels, Belgium 
   | Enrico Spinielli and Rainer Koelle, EUROCONTROL, Brussels, Belgium
 output:
-  bookdown::pdf_document2:
-    toc: false
   bookdown::word_document2:
+    toc: false
+    reference_docx: tmpl-ref.docx
+  bookdown::pdf_document2:
     toc: false
   html_document:
     df_print: paged
@@ -16,6 +17,7 @@ bibliography: paperxx.bib
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
 ```
 
 # Abstract
@@ -278,12 +280,44 @@ knitr::include_graphics("figures/rolling-window-mean.png")
 
 
 
-## Replicating Aerodrome Performance Indicators
+## Aerodrome Performance Indicators
 
 To demonstrate the principal feasibility, this paper replicates two of the currently used ANS performance indicators for the airport environment.
 
+### Additional Time in Terminal Airspace
+
+The additional time in the terminal airspace is defined as the average of the additional time of arriving traffic observed between the entry within the terminal airspace and landing.
+The additional time is determined based on the difference between the observed actual travelling time and a respective reference time for the arrival entry sector, landing runway, and aircraft class, c.f \@ref(eq:addASMA).
+
+\begin{equation}     
+(\#eq:addASMA)
+avgAddASMA =\frac{\sum_{f_i}{  actualASMA_i - refASMA_{(class,entry,rwy)}  }}{\sum_{f_i}{i}}
+\end{equation}
+
+As mentioned above, for Dublin (EIDW) the coverage did not allow to measure landing times.
+Accordingly, a proxy for the arrival process **end time** is determined with the 8NM gate.
+At this moment in time aircraft are established on final.
+It is assumed that the remaining flight time is a systemic time elapsing that is captured by the difference between the travel times and reference times measured with landing timestamps.
+Table \@ref(tab:asma-eidw) shows the numerical results for this study and aforementioend approximisation.
+For EIDW an average additional ASMA time of 3.64 min/arrival is measured.
+
+(ref:asma-eidw) additional ASMA time measured with OSN data
+
+```{r asma-eidw, echo=FALSE, message=FALSE}
+asma_eidw <- readr::read_csv("./data/EIDW-study-ASMA.csv")
+knitr::kable(
+  asma_eidw, booktabs = TRUE,
+  caption = '(ref:asma-eidw)'
+)
+```
+
+### Additional Taxi-Out Time
+
 The additional taxi-out time is defined as the average of the additional taxi-out times of all departing aircraft.
 The additioanl taxi-out time of an individual flight is determined as the difference between the observed actual taxi-out time and an associated reference taxi-out time [@pru_addTXOT_2015].
+Taxi out is defined as the time elapsing between the actual off-block and actual take-off of an aircraft.
+Accordingly, this metric requires the identification of these surface movement events.
+It follows from the previous section that taxi-times cannot be derived from the OSN data feed for Dublin (EIDW) at the time being. This section reports on results for Frankfurt Rhine/Main airport (EDDF)
 
 \begin{equation}     
 (\#eq:addTXOT)
@@ -292,6 +326,24 @@ avgAddTXOT =\frac{\sum_{f_i}{  actualTXOT_i - refTXOT_{(stand,rwy)}  }}{\sum_{f_
 
 
 see \@ref(eq:addTXOT)
+
+Table \@ref(tab:txot-eddf) shows the numerical results for this study.
+A critical element that requires further analysis is the influence of aircraft for which not stand could had been identified.
+This paper applies a grouping approach. Stands located in close proximity are considered as one stand cluster.
+Approximately 70% of the traffic was corrently identified in terms of parking positions.
+The identification of the used runway was done on the basis of a simple position fix for the take-off event.
+With these approximations, an average additional ASMA time of 4.61 min/departure is measured.
+This overall results also ranges within the data published by the PRU.
+
+(ref:txot-eddf) additional txot time measured with OSN data
+
+```{r txot-eddf, echo=FALSE, message=FALSE}
+txot_eddf <- readr::read_csv("./data/EDDF_analytic_txot.csv")
+knitr::kable(
+  txot_eddf, booktabs = TRUE,
+  caption = '(ref:txot-eddf)'
+)
+```
 
 
 # Results - arrival management (en-route delay absorption)
@@ -324,7 +376,7 @@ Fig. \@ref(fig:dips) shows the concept of the decelartion indicator.
 (ref:dips) Deceleration indicator concept
 
 ```{r dips, fig.cap="(ref:dips)", out.width="50%", fig.pos="h", echo=FALSE}
-knitr::include_graphics("figures/dips.png")
+knitr::include_graphics("./figures/dips-methodology.png")
 ```
 
 

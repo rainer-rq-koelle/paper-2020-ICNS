@@ -1,0 +1,17 @@
+name: "ICNS2020 - Operational Performance Analyses with Community Collected Open Data"
+output_dir: "docs"
+# include: [xxxxx.R]
+# rendering of Rmd files can only be surpressed by renaming them starting with _
+exclude: ["data/*","data-src/*","*.doc","*.docx","*.pdf","x*","tmpl_latex/*"]
+navbar:
+  title: "ICNS2020 - Open Data Performance Analyses"
+left:
+  - text: "Home"
+href: index.html
+#- text: "More"
+#href: trajectory-processing.html
+output:
+  html_document:
+    theme: cosmo
+    toc: true
+    highlight: textmate

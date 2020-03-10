@@ -200,6 +200,12 @@ eidw_analytic_data <- it %>%
 # write_csv(eidw_analytic_data, "./data/EIDW_analytic_data.csv")
 ```
 
+
+if(!exists("eidw_analytic_data")){
+  message("trying to load analytica data from file!")
+  eidw_analytic_data <- readr::read_csv("./data/EIDW_analytic_data.csv")
+}
+
 asma <- eidw_analytic_data %>% group_by(icao24, callsign, DOF) %>%
   arrange(icao24, callsign, DOF) %>%
   filter(point == "NM40" | point == "NM08") %>% 
@@ -210,6 +216,7 @@ asma <- eidw_analytic_data %>% group_by(icao24, callsign, DOF) %>%
 
 # visual inspection - here can ml help?
 brg_cut <-c(0,45,115,170,265,360)  # maybe another cut at 325
+cut_lbls<-c("0-45","45-115","115-170","170-265","265-360")
 ggplot(data = asma, mapping=aes(x = BRG, fill=AP_C_RWY)) + 
   geom_histogram(binwidth=5) +
   geom_vline(xintercept=brg_cut, color="red", linetype="dotted") +
@@ -220,16 +227,38 @@ ggplot(data = asma, mapping=aes(x = BRG, fill=AP_C_RWY)) +
   # top right corner
   theme(legend.justification=c(0.9,1), legend.position=c(0.9,1))
 
-ggsave("EIDW-asma-sectors.png", path="./figures")
+# ggsave("EIDW-asma-sectors.png", path="./figures")
 
-================================= stopped here ===============================
+# update asma with bearing sectors
+asma <- asma %>% 
+  mutate( ASMA_SEC = ifelse(point == "NM40", cut(BRG, breaks=brg_cut, labels=cut_lbls), NA)
+         ,ASMA_LBL = cut(BRG, breaks=brg_cut)
+  ) 
+
+asma_ind <- asma %>% select(icao24, callsign, DOF, time, AC_CLASS, AP_C_RWY, point, ASMA_SEC, ASMA_LBL) %>%
+  group_by(icao24, callsign, DOF) %>% 
+  filter(point %in% c("NM40","NM08")) %>% 
+  mutate(TRAVEL = ifelse(point == "NM40", lead(time)-time, NA)) %>% 
+  filter(point == "NM40") %>% ungroup()
+
+asma_ref <- asma_ind %>% group_by(ASMA_SEC,ASMA_LBL, AP_C_RWY, AC_CLASS) %>%
+  summarise(N = n(), N_NA = sum(is.na(TRAVEL)), REF = quantile(TRAVEL, probs=0.2, na.rm=TRUE)) %>%
+  ungroup()
+
+asma_ind <- asma_ind %>% inner_join(asma_ref, by=c("ASMA_SEC","ASMA_LBL","AP_C_RWY","AC_CLASS")) %>%
+  mutate(ADD_ASMA = TRAVEL - REF) %>%
+  summarise(
+     ADD_ASMA = sum(ADD_ASMA, na.rm=TRUE), TRAVEL = sum(TRAVEL, na.rm=TRUE)
+    ,REF      = sum(REF, na.rm=TRUE)
+    ) %>%
+  mutate(N = sum(asma_ref$N), N_NA = sum(asma_ref$N_NA), N_VALID = N - N_NA
+    ,AVG_ADD_ASMA = ADD_ASMA / N_VALID  
+  ) 
+  
+write_csv(asma_ind, "./data/EIDW-study-ASMA.csv")
 
 
-calc_dist <- function(.trj, .arp){
-  df <- .trj %>% mutate(DIST_ARP = geosphere::distHaversine(.arp), cbind(lon,lat))
-}
-
-
+################# RUN FOR PAPER COMPLETED ##################################
 
 
 ```{r, eval=FALSE}
